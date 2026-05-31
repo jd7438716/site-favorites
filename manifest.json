@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Site Favorites Sidebar",
+  "version": "0.1.0",
+  "description": "按域名分组的网页收藏夹：靠边悬浮按钮 + 页面内侧边栏。",
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
