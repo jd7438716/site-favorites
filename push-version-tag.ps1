@@ -12,13 +12,14 @@
     manifest.json 的 version 会写成去掉 v 前缀后的版本号，例如标签 v1.0531.01 对应版本 1.0531.01
 #>
 
-$ErrorActionPreference = 'Stop'
-
+[CmdletBinding()]
 param(
     [switch]$AllowDirty,
     [switch]$NoFetch,
     [switch]$DryRun
 )
+
+$ErrorActionPreference = 'Stop'
 
 function Assert-GitOk([switch]$AllowDirty) {
     git rev-parse --is-inside-work-tree *> $null
