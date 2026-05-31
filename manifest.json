@@ -3,6 +3,12 @@
   "name": "Site Favorites Sidebar",
   "version": "0.1.0",
   "description": "域名级网页收藏夹：无需登录，站点内侧边栏管理收藏（悬浮按钮快速开关/收藏）。",
+  "homepage_url": "https://github.com/jd7438716/site-favorites",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "permissions": ["storage"],
   "host_permissions": ["<all_urls>"],
   "content_scripts": [

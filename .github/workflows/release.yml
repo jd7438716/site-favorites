@@ -1,0 +1,34 @@
+name: Release Extension Zip
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_NAME="${GITHUB_REF_NAME}"
+          mkdir -p build/icons
+          cp manifest.json contentScript.js build/
+          cp -R icons/* build/icons/
+          cd build
+          zip -r "../site-favorites-sidebar_${TAG_NAME}.zip" *
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: site-favorites-sidebar_${{ github.ref_name }}.zip
