@@ -14,13 +14,24 @@
 
 $ErrorActionPreference = 'Stop'
 
-function Assert-GitOk {
+param(
+    [switch]$AllowDirty,
+    [switch]$NoFetch,
+    [switch]$DryRun
+)
+
+function Assert-GitOk([switch]$AllowDirty) {
     git rev-parse --is-inside-work-tree *> $null
     if ($LASTEXITCODE -ne 0) { throw "当前目录不是 Git 仓库。" }
 
+    $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+    if (-not $branch -or $branch -eq 'HEAD') { throw "当前为 detached HEAD，无法发布，请切换到分支后重试。" }
+
     $status = git status --porcelain
-    if ($status) {
-        throw "工作区不干净，请先提交或清理变更后再执行。"
+    if ($status -and -not $AllowDirty) {
+        Write-Host "当前工作区变更：" -ForegroundColor Yellow
+        git status --porcelain
+        throw "工作区不干净，请先提交或清理变更；或使用 -AllowDirty 让脚本自动 stash 后发布。"
     }
 }
 
@@ -37,25 +48,31 @@ function Update-ManifestVersion([string]$manifestPath, [string]$nextVersion) {
     Set-Content -Path $manifestPath -Value $nextRaw -Encoding UTF8
 }
 
-Assert-GitOk
+Assert-GitOk -AllowDirty:$AllowDirty
+
+$stashName = ""
+$didStash = $false
+$remote = "origin"
 
 $now       = Get-Date
 $yearDiff  = $now.Year - 2025
 $datePart  = $now.ToString('MMdd')
 $tagPrefix = "v$yearDiff.$datePart."
 
-Write-Host "正在获取标签列表..." -ForegroundColor Cyan
+if (-not $NoFetch) {
+    Write-Host "正在获取标签列表..." -ForegroundColor Cyan
 
-$oldEAP = $ErrorActionPreference
-$ErrorActionPreference = 'SilentlyContinue'
-git fetch --tags origin 2>$null | Out-Null
-$fetchOk = $LASTEXITCODE -eq 0
-$ErrorActionPreference = $oldEAP
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    git fetch --tags $remote 2>$null | Out-Null
+    $fetchOk = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $oldEAP
 
-if (-not $fetchOk) {
-    Write-Host ""
-    Write-Host "警告：无法连接远程仓库获取最新标签，将使用本地标签继续计算..." -ForegroundColor Yellow
-    Write-Host ""
+    if (-not $fetchOk) {
+        Write-Host ""
+        Write-Host "警告：无法连接远程仓库获取最新标签，将使用本地标签继续计算..." -ForegroundColor Yellow
+        Write-Host ""
+    }
 }
 
 $allTags = git tag -l "$($tagPrefix)*" 2>$null
@@ -72,6 +89,9 @@ if ($allTags) {
 $newTag = $tagPrefix + ([int]$nextSeq).ToString('00')
 $newVersion = $newTag.Substring(1)
 
+git rev-parse -q --verify "refs/tags/$newTag" *> $null
+if ($LASTEXITCODE -eq 0) { throw "标签已存在：$newTag" }
+
 Write-Host ""
 Write-Host "即将创建并推送标签: " -NoNewline
 Write-Host $newTag -ForegroundColor Green
@@ -79,17 +99,38 @@ Write-Host "对应扩展版本: " -NoNewline
 Write-Host $newVersion -ForegroundColor Green
 Write-Host ""
 
-$manifestPath = Join-Path (Get-Location) 'manifest.json'
-Update-ManifestVersion -manifestPath $manifestPath -nextVersion $newVersion
+if ($DryRun) {
+    Write-Host "DryRun: 将更新版本、提交、打 tag 并 push。" -ForegroundColor Cyan
+    exit 0
+}
 
-git add manifest.json
-git commit -m "chore(release): $newTag"
+try {
+    if ($AllowDirty) {
+        $stashName = "release-stash-$([guid]::NewGuid().ToString('N').Substring(0,8))"
+        $dirty = git status --porcelain
+        if ($dirty) {
+            git stash push -u -m $stashName | Out-Null
+            $didStash = $true
+        }
+    }
 
-git tag $newTag
-git push origin HEAD
-git push origin $newTag
+    $manifestPath = Join-Path (Get-Location) 'manifest.json'
+    Update-ManifestVersion -manifestPath $manifestPath -nextVersion $newVersion
 
-$remoteUrl = git remote get-url origin 2>$null
+    git add manifest.json
+    git commit -m "chore(release): $newTag"
+
+    git tag -a $newTag -m $newTag
+    git push $remote HEAD
+    git push $remote $newTag
+}
+finally {
+    if ($didStash) {
+        git stash pop | Out-Null
+    }
+}
+
+$remoteUrl = git remote get-url $remote 2>$null
 $repoPath  = if ($remoteUrl -match '[:/]([^/]+/[^/]+?)(?:\.git)?$') { $Matches[1] } else { '<owner>/<repo>' }
 
 Write-Host ""

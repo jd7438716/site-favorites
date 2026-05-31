@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Build zip
         shell: bash
@@ -25,10 +27,16 @@ jobs:
           cp -R icons/* build/icons/
           cd build
           zip -r "../site-favorites-sidebar_${TAG_NAME}.zip" *
+          cd ..
+          sha256sum "site-favorites-sidebar_${TAG_NAME}.zip" > "site-favorites-sidebar_${TAG_NAME}.zip.sha256"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          files: site-favorites-sidebar_${{ github.ref_name }}.zip
+          name: Site Favorites Sidebar ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            site-favorites-sidebar_${{ github.ref_name }}.zip
+            site-favorites-sidebar_${{ github.ref_name }}.zip.sha256
