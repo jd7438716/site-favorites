@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Site Favorites Sidebar",
   "version": "0.1.0",
-  "description": "按域名分组的网页收藏夹：靠边悬浮按钮 + 页面内侧边栏。",
+  "description": "域名级网页收藏夹：无需登录，站点内侧边栏管理收藏（悬浮按钮快速开关/收藏）。",
   "permissions": ["storage"],
   "host_permissions": ["<all_urls>"],
   "content_scripts": [
